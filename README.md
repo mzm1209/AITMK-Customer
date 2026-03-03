@@ -92,6 +92,17 @@ python3 -m http.server 5173
 http://localhost:5173
 ```
 
+
+### 常见报错排查
+
+1. 浏览器控制台出现 `origin 'null'` 或 `file://...app.js` / `fetch` 报错
+   - 原因：你是双击 `index.html` 打开的（`file://`）。
+   - 解决：必须改为 `http://localhost:5173` 访问。
+
+2. 浏览器提示 `No 'Access-Control-Allow-Origin' header`
+   - 原因：Spring Boot 未放行前端来源。
+   - 解决：在后端 CORS 中允许 `http://localhost:5173`（或你实际前端地址）。
+
 ## 与你当前 Spring Boot 的对接建议
 
 - webhook 接收后，把 inbound 与 AI outbound 都持久化（同一会话维度）。

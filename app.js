@@ -21,6 +21,11 @@ let lastCustomerSnapshot = [];
 init();
 
 function init() {
+  if (window.location.protocol === 'file:') {
+    setFileProtocolWarning();
+    return;
+  }
+
   refreshCustomersBtn.addEventListener('click', () => loadCustomers(true));
 
   messageForm.addEventListener('submit', async (event) => {
@@ -41,7 +46,7 @@ function init() {
       await loadCustomers();
       statusText.textContent = '发送成功';
     } catch (error) {
-      statusText.textContent = `发送失败：${error.message}`;
+      statusText.textContent = buildNetworkError('发送失败', error);
     } finally {
       if (currentCustomerId) {
         sendBtn.disabled = false;
@@ -51,6 +56,19 @@ function init() {
 
   loadCustomers(true);
   startCustomersPolling();
+}
+
+function setFileProtocolWarning() {
+  sendBtn.disabled = true;
+  statusText.textContent = '检测到 file:// 打开方式，请改用 http://localhost:5173 访问页面';
+  windowText.className = 'muted warning';
+  windowText.textContent = 'file:// 场景会触发浏览器同源限制，无法调用后端 API';
+
+  const empty = document.createElement('li');
+  empty.className = 'muted';
+  empty.textContent = '请先运行: python3 -m http.server 5173';
+  customerListEl.innerHTML = '';
+  customerListEl.appendChild(empty);
 }
 
 function getApiBaseUrl() {
@@ -80,7 +98,7 @@ async function loadCustomers(forceRender = false) {
 
     statusText.textContent = `客户列表同步：${new Date().toLocaleTimeString()}`;
   } catch (error) {
-    statusText.textContent = `客户列表同步失败：${error.message}`;
+    statusText.textContent = buildNetworkError('客户列表同步失败', error);
   }
 }
 
@@ -173,7 +191,7 @@ async function loadMessages() {
     renderMessages(messages);
     statusText.textContent = `消息同步：${new Date().toLocaleTimeString()}`;
   } catch (error) {
-    statusText.textContent = `消息同步失败：${error.message}`;
+    statusText.textContent = buildNetworkError('消息同步失败', error);
   }
 }
 
@@ -216,6 +234,18 @@ function formatTime(ts) {
   if (!ts) return '';
   const d = new Date(ts);
   return Number.isNaN(d.getTime()) ? String(ts) : d.toLocaleString();
+}
+
+function buildNetworkError(prefix, error) {
+  if (window.location.protocol === 'file:') {
+    return `${prefix}：请使用 http://localhost:5173 访问前端，不要用 file://`;
+  }
+
+  if (error instanceof TypeError) {
+    return `${prefix}：网络/CORS 异常，请检查后端是否配置 Access-Control-Allow-Origin（例如 http://localhost:5173）`;
+  }
+
+  return `${prefix}：${error.message}`;
 }
 
 async function fetchCustomers() {
