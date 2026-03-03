@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WhatsApp 客户聊天工作台</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <aside class="sidebar">
+        <h1>客户会话</h1>
+        <p class="muted">输入客户 WhatsApp 号码开始聊天</p>
+        <form id="session-form" class="session-form">
+          <label for="customerId">客户号码（含国家码）</label>
+          <input id="customerId" name="customerId" placeholder="例如：8613800138000" required />
+          <button type="submit">打开会话</button>
+        </form>
+
+        <section class="config">
+          <h2>API 配置</h2>
+          <label for="apiBaseUrl">后端地址</label>
+          <input id="apiBaseUrl" value="http://localhost:8080" />
+          <p class="muted">默认调用 Spring Boot 服务。</p>
+        </section>
+      </aside>
+
+      <section class="chat-panel">
+        <header>
+          <h2 id="chat-title">未选择会话</h2>
+          <p id="connection-status" class="muted">请先输入客户号码</p>
+        </header>
+
+        <ul id="message-list" class="message-list"></ul>
+
+        <form id="message-form" class="message-form" aria-label="发送消息">
+          <textarea id="messageInput" rows="3" placeholder="输入回复内容..." required></textarea>
+          <button type="submit" id="send-btn" disabled>发送</button>
+        </form>
+      </section>
+    </main>
+
+    <template id="message-template">
+      <li class="message-item">
+        <p class="meta"></p>
+        <p class="content"></p>
+      </li>
+    </template>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>
