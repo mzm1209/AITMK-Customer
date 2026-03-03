@@ -1,61 +1,96 @@
-# WhatsApp 客服聊天 Web 项目
+# WhatsApp 客服聊天 Web 项目（客户列表版）
 
-这是一个可在 VS Code 中直接运行的轻量 Web 前端，用于对接你已完成的 Spring Boot WhatsApp webhook 服务，实现：
+该前端用于对接你现有的 Spring Boot webhook 处理服务，重点支持：
 
-- 输入客户号码进入会话
-- 拉取客户消息
-- 发送回复消息给客户
+- 左侧显示「有消息的客户列表」
+- 点击客户后显示对应聊天记录（含 AI 自动回复）
+- 展示 24 小时会话窗口状态
+- 在窗口内发送人工回复
 
-## 1. 对接后端接口约定
+## 后端接口约定（建议）
 
-前端默认调用 `http://localhost:8080`，你可以在页面上修改后端地址。
+> 你已经在 `WhatsAppWebhookServiceImpl` 里做了首次 AI 自动回复逻辑。前端只负责读取这些结果并展示。
 
-需要后端提供：
+### 1) 获取客户列表
 
-1. `GET /api/chat/messages?customerId=xxx`
-   - 返回 JSON 数组，例如：
-   ```json
-   [
-     {
-       "id": "msg-1",
-       "direction": "inbound",
-       "content": "你好",
-       "timestamp": "2026-01-01T10:00:00Z"
-     },
-     {
-       "id": "msg-2",
-       "direction": "outbound",
-       "content": "您好，请问有什么可以帮您？",
-       "timestamp": "2026-01-01T10:00:05Z"
-     }
-   ]
-   ```
+`GET /api/chat/customers`
 
-2. `POST /api/chat/reply`
-   - 请求体：
-   ```json
-   {
-     "customerId": "8613800138000",
-     "content": "您好，我来为您处理"
-   }
-   ```
+返回示例：
 
-## 2. 在 VS Code 中启动
+```json
+[
+  {
+    "customerId": "8613800138000",
+    "customerName": "张三",
+    "lastMessage": "你好",
+    "lastTimestamp": "2026-01-01T10:00:00Z",
+    "unreadCount": 2,
+    "within24h": true,
+    "lastCustomerMessageTime": "2026-01-01T09:59:00Z"
+  }
+]
+```
 
-项目是纯静态页面，无需安装依赖。
+### 2) 获取某个客户聊天记录
+
+`GET /api/chat/messages?customerId=8613800138000`
+
+返回示例（可含 AI 自动回复）：
+
+```json
+[
+  {
+    "id": "m1",
+    "direction": "inbound",
+    "content": "你们营业时间？",
+    "timestamp": "2026-01-01T10:00:00Z"
+  },
+  {
+    "id": "m2",
+    "direction": "outbound",
+    "source": "ai",
+    "content": "您好，我们是9:00-18:00",
+    "timestamp": "2026-01-01T10:00:02Z"
+  }
+]
+```
+
+### 3) 人工回复
+
+`POST /api/chat/reply`
+
+```json
+{
+  "customerId": "8613800138000",
+  "content": "您好，我来继续跟进您的问题"
+}
+```
+
+### 4) 可选：已读标记
+
+`POST /api/chat/read`
+
+```json
+{
+  "customerId": "8613800138000"
+}
+```
+
+## 在 VS Code 启动
 
 ```bash
 python3 -m http.server 5173
 ```
 
-浏览器打开：
+浏览器访问：
 
 ```text
 http://localhost:5173
 ```
 
-## 3. 你可能要在 Spring Boot 里补充
+## 与你当前 Spring Boot 的对接建议
 
-- 开启 CORS（允许来自 `http://localhost:5173` 的跨域请求）
-- 将 webhook 收到的消息落库（或缓存）并提供查询接口
-- 将客服回复接口与 WhatsApp 发送消息 API 对接
+- webhook 接收后，把 inbound 与 AI outbound 都持久化（同一会话维度）。
+- `/api/chat/customers` 聚合每个客户最后一条消息与未读数。
+- `within24h` 建议以后端为准（根据最后 inbound 时间计算）。
+- 允许 `http://localhost:5173` 跨域访问。
