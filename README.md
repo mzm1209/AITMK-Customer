@@ -9,6 +9,8 @@
 
 ## 后端接口约定（建议）
 
+默认后端地址：`http://localhost:6153`。
+
 > 你已经在 `WhatsAppWebhookServiceImpl` 里做了首次 AI 自动回复逻辑。前端只负责读取这些结果并展示。
 
 ### 1) 获取客户列表
@@ -108,4 +110,4 @@ http://localhost:5173
 - webhook 接收后，把 inbound 与 AI outbound 都持久化（同一会话维度）。
 - `/api/chat/customers` 聚合每个客户最后一条消息与未读数。
 - `within24h` 建议以后端为准（根据最后 inbound 时间计算）。
-- 允许 `http://localhost:5173` 跨域访问。
+- 允许 `http://localhost:5173` 跨域访问（后端服务端口可为 `6153`）。
