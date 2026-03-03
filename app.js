@@ -60,13 +60,13 @@ function init() {
 
 function setFileProtocolWarning() {
   sendBtn.disabled = true;
-  statusText.textContent = '检测到 file:// 打开方式，请改用 http://localhost:5173 访问页面';
+  statusText.textContent = '检测到 file:// 打开方式，请改用本地 HTTP 地址访问（如 http://localhost:5173）';
   windowText.className = 'muted warning';
   windowText.textContent = 'file:// 场景会触发浏览器同源限制，无法调用后端 API';
 
   const empty = document.createElement('li');
   empty.className = 'muted';
-  empty.textContent = '请先运行: python3 -m http.server 5173';
+  empty.textContent = '请先启动本地 HTTP 服务（如 python3 / npx http-server / Live Server）';
   customerListEl.innerHTML = '';
   customerListEl.appendChild(empty);
 }
