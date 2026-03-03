@@ -78,6 +78,10 @@
 
 ## 在 VS Code 启动
 
+
+> ⚠️ 请不要直接双击 `index.html`（`file://` 打开）。
+> 浏览器会把页面视为 `null` origin，可能拦截脚本并报 CORS 错误。请使用本地 HTTP 服务访问。
+
 ```bash
 python3 -m http.server 5173
 ```
