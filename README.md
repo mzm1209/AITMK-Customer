@@ -62,14 +62,19 @@
 
 `POST /api/chat/reply`
 
+> 你的后端 `ManualReplyRequest` 需要字段：`from`、`customerId`、`message`。
+
 ```json
 {
+  "from": "1019964791197772",
   "customerId": "628118189951",
-  "content": "您好，我来继续跟进您的问题"
+  "message": "您好，我来继续跟进您的问题"
 }
 ```
 
 > `POST /api/chat/read` 仍为可选接口，若后端没有该接口，前端会忽略失败。
+>
+> 如果出现 `400 Bad Request`，请先检查页面左侧 `Reply From（业务号码ID）` 是否填写。
 
 ## 在 VS Code 启动
 

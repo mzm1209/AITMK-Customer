@@ -8,6 +8,7 @@ const windowText = document.getElementById('conversation-window');
 const statusText = document.getElementById('connection-status');
 const sendBtn = document.getElementById('send-btn');
 const apiBaseUrlInput = document.getElementById('apiBaseUrl');
+const replyFromInput = document.getElementById('replyFrom');
 
 const customerTemplate = document.getElementById('customer-item-template');
 const messageTemplate = document.getElementById('message-template');
@@ -31,14 +32,19 @@ function init() {
   messageForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     const content = messageInput.value.trim();
+    const from = getReplyFrom();
 
     if (!currentCustomerId || !content || sendBtn.disabled) return;
+    if (!from) {
+      statusText.textContent = '请先填写 Reply From（业务号码ID）';
+      return;
+    }
 
     sendBtn.disabled = true;
     statusText.textContent = '发送中...';
 
     try {
-      await sendMessage(currentCustomerId, content);
+      await sendMessage(from, currentCustomerId, content);
       messageInput.value = '';
       await loadMessages();
       await loadCustomers();
@@ -69,6 +75,10 @@ function setFileProtocolWarning() {
 
 function getApiBaseUrl() {
   return apiBaseUrlInput.value.trim().replace(/\/$/, '');
+}
+
+function getReplyFrom() {
+  return (replyFromInput?.value || '').trim();
 }
 
 function startCustomersPolling() {
@@ -263,12 +273,12 @@ async function fetchMessages(customerId) {
   return res.json();
 }
 
-async function sendMessage(customerId, content) {
+async function sendMessage(from, customerId, content) {
   const url = `${getApiBaseUrl()}/api/chat/reply`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ customerId, content }),
+    body: JSON.stringify({ from, customerId, message: content }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json().catch(() => ({}));
