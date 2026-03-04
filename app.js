@@ -32,9 +32,7 @@ function init() {
     event.preventDefault();
     const content = messageInput.value.trim();
 
-    if (!currentCustomerId || !content || sendBtn.disabled) {
-      return;
-    }
+    if (!currentCustomerId || !content || sendBtn.disabled) return;
 
     sendBtn.disabled = true;
     statusText.textContent = '发送中...';
@@ -48,9 +46,7 @@ function init() {
     } catch (error) {
       statusText.textContent = buildNetworkError('发送失败', error);
     } finally {
-      if (currentCustomerId) {
-        sendBtn.disabled = false;
-      }
+      sendBtn.disabled = false;
     }
   });
 
@@ -114,13 +110,13 @@ function renderCustomers(customers) {
   }
 
   customers
-    .sort((a, b) => new Date(b.lastTimestamp || 0) - new Date(a.lastTimestamp || 0))
+    .sort((a, b) => new Date(b.lastMessageAt || b.lastTimestamp || 0) - new Date(a.lastMessageAt || a.lastTimestamp || 0))
     .forEach((item) => {
       const li = customerTemplate.content.firstElementChild.cloneNode(true);
       const customerId = item.customerId || item.from || item.waId;
       const name = item.customerName || item.name || customerId;
-      const preview = item.lastMessage || '（无最近消息）';
-      const time = formatTime(item.lastTimestamp);
+      const preview = item.lastMessage || item.message || '（无最近消息）';
+      const time = formatTime(item.lastMessageAt || item.lastTimestamp || item.timestamp);
       const unread = Number(item.unreadCount || 0);
 
       li.dataset.customerId = customerId;
@@ -134,9 +130,7 @@ function renderCustomers(customers) {
         badge.textContent = unread > 99 ? '99+' : String(unread);
       }
 
-      if (customerId === currentCustomerId) {
-        li.classList.add('active');
-      }
+      if (customerId === currentCustomerId) li.classList.add('active');
 
       li.addEventListener('click', () => selectCustomer(item));
       li.addEventListener('keydown', (event) => {
@@ -157,12 +151,9 @@ async function selectCustomer(customer) {
   messageList.innerHTML = '';
 
   chatTitle.textContent = `客户：${customer.customerName || customer.name || customerId}`;
-  updateWindowHint(customer.within24h, customer.lastCustomerMessageTime);
+  updateWindowHint(customer.within24h, customer.lastCustomerMessageTime || customer.lastMessageAt);
 
-  sendBtn.disabled = customer.within24h === false;
-  if (sendBtn.disabled) {
-    statusText.textContent = '客户最后互动超过24小时，暂不支持自由回复';
-  }
+  sendBtn.disabled = false;
 
   await loadMessages();
   startMessagesPolling();
@@ -179,7 +170,7 @@ function updateWindowHint(within24h, lastCustomerMessageTime) {
     windowText.textContent = '24小时会话窗口内，可发送人工消息';
   } else {
     windowText.className = 'muted';
-    windowText.textContent = '会话窗口状态由后端判断';
+    windowText.textContent = '当前接口未返回24小时窗口字段，默认允许发送';
   }
 }
 
@@ -196,38 +187,48 @@ async function loadMessages() {
 }
 
 function renderMessages(messages) {
+  if (!Array.isArray(messages)) return;
+
   messages
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .map(normalizeMessage)
+    .sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0))
     .forEach((item) => {
-      const id = item.id || `${item.direction}-${item.timestamp}-${item.content}`;
+      const id = item.id || `${item.sender}-${item.timestamp}-${item.content}`;
       if (seenMessageIds.has(id)) return;
       seenMessageIds.add(id);
 
       const li = messageTemplate.content.firstElementChild.cloneNode(true);
-      const direction = normalizeDirection(item.direction, item.senderType);
-      const source = item.source || (item.aiAutoReply ? 'ai' : 'manual');
 
-      li.classList.toggle('outbound', direction === 'outbound');
-      li.classList.toggle('auto-reply', source === 'ai');
+      li.classList.toggle('outbound', item.direction === 'outbound');
+      li.classList.toggle('auto-reply', item.source === 'ai');
 
-      li.querySelector('.meta').textContent = `${labelByDirection(direction, source)} · ${formatTime(item.timestamp)}`;
-      li.querySelector('.content').textContent = item.content || item.text || '';
+      li.querySelector('.meta').textContent = `${labelByMessage(item)} · ${formatTime(item.timestamp)}`;
+      li.querySelector('.content').textContent = item.content || '';
       messageList.appendChild(li);
     });
 
   messageList.scrollTop = messageList.scrollHeight;
 }
 
-function labelByDirection(direction, source) {
-  if (direction === 'inbound') return '客户';
-  if (source === 'ai') return 'AI自动回复';
-  return '人工客服';
+function normalizeMessage(item) {
+  const sender = String(item.sender || '').toLowerCase();
+  const direction = sender === 'customer' ? 'inbound' : 'outbound';
+  const source = sender === 'ai' ? 'ai' : sender === 'agent' ? 'manual' : 'manual';
+
+  return {
+    id: item.id,
+    sender,
+    direction,
+    source,
+    content: item.message || item.content || item.text || '',
+    timestamp: item.timestamp,
+  };
 }
 
-function normalizeDirection(direction, senderType) {
-  if (direction) return String(direction).toLowerCase();
-  if (senderType && String(senderType).toLowerCase() === 'customer') return 'inbound';
-  return 'outbound';
+function labelByMessage(item) {
+  if (item.sender === 'customer') return '客户';
+  if (item.sender === 'ai' || item.source === 'ai') return 'AI自动回复';
+  return '人工客服';
 }
 
 function formatTime(ts) {
