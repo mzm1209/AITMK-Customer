@@ -11,7 +11,6 @@
       <aside class="sidebar">
         <div class="sidebar-header">
           <h1>客户会话</h1>
-          <button id="refreshCustomersBtn" class="ghost-btn" type="button">刷新</button>
         </div>
 
         <section class="auth-panel">
@@ -31,6 +30,9 @@
           <button type="button" id="open-api-settings" class="ghost-btn">服务地址设置</button>
           <button type="button" id="open-from-settings" class="ghost-btn">业务号码设置</button>
         </section>
+
+        <input id="apiBaseUrl" type="hidden" value="https://crm.wondermindedu.com:6153" />
+        <input id="replyFrom" type="hidden" value="1019964791197772" />
 
         <ul id="customer-list" class="customer-list"></ul>
       </aside>
@@ -54,8 +56,8 @@
     <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-content">
         <h3 id="modal-title">设置</h3>
-        <label id="modal-label" for="modal-input"></label>
-        <input id="modal-input" />
+        <label id="modal-label" for="modal-input">设置值</label>
+        <input id="modal-input" title="设置值" placeholder="请输入设置值" aria-label="设置值" />
         <div class="modal-actions">
           <button type="button" id="modal-cancel" class="ghost-btn">取消</button>
           <button type="button" id="modal-save">保存</button>
@@ -83,8 +85,6 @@
       </li>
     </template>
 
-    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7/bundles/stomp.umd.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

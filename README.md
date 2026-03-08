@@ -88,6 +88,8 @@
 - 订阅主题：`/topic/agent/{agentRowId}`
 - 消息类型：`history` / `new_message`
 
+> 说明：当前页面未默认加载第三方 CDN 的 SockJS/STOMP 脚本。若未注入这两个库，将自动使用轮询模式，不影响基础客服功能。
+
 ---
 
 ## 本地运行

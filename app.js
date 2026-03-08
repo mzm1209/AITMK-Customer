@@ -9,7 +9,6 @@ const DEFAULTS = {
 };
 
 const customerListEl = document.getElementById('customer-list');
-const refreshCustomersBtn = document.getElementById('refreshCustomersBtn');
 const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('messageInput');
 const messageList = document.getElementById('message-list');
@@ -73,14 +72,6 @@ function init() {
 }
 
 function bindEvents() {
-  refreshCustomersBtn.addEventListener('click', () => {
-    if (!state.auth.loggedIn) {
-      statusText.textContent = '请先登录';
-      return;
-    }
-    loadCustomers(true);
-  });
-
   loginForm.addEventListener('submit', onLogin);
   logoutBtn.addEventListener('click', onLogout);
   messageForm.addEventListener('submit', onSendMessage);
