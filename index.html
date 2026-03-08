@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WhatsApp 客服聊天工作台</title>
+    <title>AITMK 客服聊天工作台</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -14,13 +14,23 @@
           <button id="refreshCustomersBtn" class="ghost-btn" type="button">刷新</button>
         </div>
 
-        <label for="apiBaseUrl">Spring Boot 地址</label>
-        <input id="apiBaseUrl" value="https://crm.wondermindedu.com:6153" />
+        <section class="auth-panel">
+          <h2>坐席登录</h2>
+          <form id="login-form" class="auth-form">
+            <input id="username" name="username" placeholder="用户名" required />
+            <input id="password" name="password" type="password" placeholder="密码" required />
+            <div class="auth-actions">
+              <button type="submit" id="login-btn">登录</button>
+              <button type="button" id="logout-btn" class="ghost-btn" disabled>登出</button>
+            </div>
+          </form>
+          <p id="auth-status" class="muted">未登录</p>
+        </section>
 
-        <label for="replyFrom">Reply From（业务号码ID）</label>
-        <input id="replyFrom" placeholder="例如：1019964791197772" />
-
-        <p class="muted">自动读取后端客户列表与消息记录。</p>
+        <section class="settings-bar">
+          <button type="button" id="open-api-settings" class="ghost-btn">服务地址设置</button>
+          <button type="button" id="open-from-settings" class="ghost-btn">业务号码设置</button>
+        </section>
 
         <ul id="customer-list" class="customer-list"></ul>
       </aside>
@@ -28,7 +38,7 @@
       <section class="chat-panel">
         <header class="chat-header">
           <h2 id="chat-title">未选择客户</h2>
-          <p id="conversation-window" class="muted">请选择左侧客户</p>
+          <p id="conversation-window" class="muted">请先登录并选择客户</p>
           <p id="connection-status" class="muted">等待连接</p>
         </header>
 
@@ -40,6 +50,18 @@
         </form>
       </section>
     </main>
+
+    <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-content">
+        <h3 id="modal-title">设置</h3>
+        <label id="modal-label" for="modal-input"></label>
+        <input id="modal-input" />
+        <div class="modal-actions">
+          <button type="button" id="modal-cancel" class="ghost-btn">取消</button>
+          <button type="button" id="modal-save">保存</button>
+        </div>
+      </div>
+    </div>
 
     <template id="customer-item-template">
       <li class="customer-item" role="button" tabindex="0">
@@ -61,6 +83,8 @@
       </li>
     </template>
 
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7/bundles/stomp.umd.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

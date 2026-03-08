@@ -12,11 +12,7 @@
 }
 
 * { box-sizing: border-box; }
-
-html,
-body {
-  height: 100%;
-}
+html, body { height: 100%; }
 
 body {
   margin: 0;
@@ -28,14 +24,14 @@ body {
 .app {
   height: 100vh;
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 380px 1fr;
   overflow: hidden;
 }
 
 .sidebar,
 .chat-panel {
   background: var(--panel);
-  padding: 1.1rem;
+  padding: 1rem;
   min-height: 0;
   overflow: hidden;
 }
@@ -43,8 +39,8 @@ body {
 .sidebar {
   border-right: 1px solid var(--line);
   display: grid;
-  grid-template-rows: auto auto auto auto 1fr;
-  gap: 0.7rem;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 0.75rem;
 }
 
 .sidebar-header {
@@ -53,24 +49,43 @@ body {
   align-items: center;
 }
 
-.sidebar h1,
-.chat-panel h2 { margin: 0; }
+h1, h2, h3, p { margin: 0; }
 
-label { font-size: 0.85rem; }
+.auth-panel {
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.auth-panel h2 { font-size: 1rem; }
+
+.auth-form {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.auth-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+
+.settings-bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
 
 input,
 textarea,
 button {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 0.65rem;
-  padding: 0.65rem 0.8rem;
+  border-radius: 0.6rem;
+  padding: 0.65rem 0.75rem;
   font: inherit;
-}
-
-textarea {
-  resize: vertical;
-  max-height: 180px;
 }
 
 button {
@@ -79,19 +94,17 @@ button {
   border: 0;
   cursor: pointer;
 }
-
 button:hover:not(:disabled) { background: var(--brand-hover); }
 button:disabled { cursor: not-allowed; opacity: 0.55; }
 
 .ghost-btn {
-  width: auto;
   background: transparent;
   color: var(--brand);
   border: 1px solid var(--line);
-  padding: 0.45rem 0.7rem;
 }
 
-.muted { color: var(--muted); font-size: 0.9rem; margin: 0; }
+.muted { color: var(--muted); font-size: 0.88rem; }
+.warning { color: var(--warn); }
 
 .customer-list {
   list-style: none;
@@ -107,19 +120,27 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
 .customer-item {
   border: 1px solid var(--line);
   border-radius: 0.7rem;
-  padding: 0.65rem;
+  padding: 0.62rem;
   cursor: pointer;
 }
-
 .customer-item:hover { border-color: #c9d3df; }
 .customer-item.active { border-color: var(--brand); background: #eefaf6; }
+.customer-item.over-24h {
+  background: #f4f4f4;
+  border-color: #d9d9d9;
+}
+.customer-item.over-24h .name,
+.customer-item.over-24h .preview,
+.customer-item.over-24h .time {
+  color: #8d8d8d;
+}
 
 .customer-item .line-1,
 .customer-item .line-2 {
   display: flex;
   justify-content: space-between;
-  align-items: center;
   gap: 0.6rem;
+  align-items: center;
 }
 
 .customer-item .name { font-weight: 600; }
@@ -140,7 +161,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   background: var(--brand);
   display: none;
 }
-
 .badge.show { display: inline-block; }
 
 .chat-panel {
@@ -154,10 +174,10 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   margin: 0;
   padding: 0;
   min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  overflow-y: auto;
 }
 
 .message-item {
@@ -166,7 +186,6 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   padding: 0.7rem 0.85rem;
   background: #f2f5f8;
 }
-
 .message-item.outbound { margin-left: auto; background: #d9f7ec; }
 .message-item.auto-reply { border: 1px dashed #73c8a9; }
 
@@ -175,36 +194,52 @@ button:disabled { cursor: not-allowed; opacity: 0.55; }
   color: var(--muted);
   margin: 0 0 0.35rem;
 }
-
 .message-item .content {
   margin: 0;
   white-space: pre-wrap;
   line-height: 1.4;
 }
 
-.warning { color: var(--warn); }
-
 .message-form {
   border-top: 1px solid var(--line);
-  padding-top: 1rem;
-  background: var(--panel);
+  padding-top: 0.9rem;
 }
 
-@media (max-width: 860px) {
-  body {
-    overflow: auto;
-  }
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.34);
+  display: grid;
+  place-items: center;
+  z-index: 999;
+}
+.hidden { display: none; }
 
+.modal-content {
+  width: min(92vw, 460px);
+  background: #fff;
+  border-radius: 0.9rem;
+  padding: 1rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+@media (max-width: 900px) {
+  body { overflow: auto; }
   .app {
     height: auto;
     min-height: 100vh;
     grid-template-columns: 1fr;
-    overflow: visible;
   }
-
   .sidebar {
     border-right: none;
     border-bottom: 1px solid var(--line);
-    max-height: 48vh;
+    max-height: 52vh;
   }
 }

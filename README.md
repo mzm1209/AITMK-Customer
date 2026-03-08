@@ -1,21 +1,41 @@
-# WhatsApp 客服聊天 Web 项目（客户列表版）
+# AITMK 客服系统 Web 前端
 
-该前端用于对接你现有的 Spring Boot webhook 服务，支持：
+基于当前服务端实现，本前端已支持：
 
-- 左侧显示客户列表
-- 点击客户查看消息记录
-- 识别 `sender=customer / ai / agent` 并按客户、AI、人工客服展示
-- 发送人工回复
+1. 坐席登录 / 登出（`/api/auth/login`、`/api/auth/logout`）
+2. 登录后同步客户会话列表与历史聊天记录
+3. WebSocket 实时订阅（`/ws` + `/topic/agent/{agentRowId}`）
+4. 24 小时规则：超时会话列表灰色显示，可查看历史，但禁用人工回复
+5. Spring Boot 地址弹窗设置（默认：`https://crm.wondermindedu.com:6153`）
+6. 业务号码弹窗设置（默认：`1019964791197772`）
+7. 客户列表置顶并按最新消息倒序显示
 
-## 当前默认后端地址
+---
 
-页面默认值已设置为：`https://crm.wondermindedu.com:6153`。
+## 接口约定（与当前后端一致）
 
-你也可以在页面左侧输入框手动改成其它地址。
+### 登录
 
-## 后端接口返回结构（按你提供的数据）
+`POST /api/auth/login`
 
-### 1) 客户列表
+```json
+{
+  "username": "agent1",
+  "password": "123456"
+}
+```
+
+### 登出
+
+`POST /api/auth/logout`
+
+```json
+{
+  "agentRowId": "A0001"
+}
+```
+
+### 客户列表
 
 `GET /api/chat/customers`
 
@@ -23,17 +43,15 @@
 [
   {
     "customerId": "628118189951",
-    "lastMessage": "I understand you're looking for our school locations...",
+    "lastMessage": "...",
     "lastMessageAt": "2026-03-04T07:59:52.733640637Z"
   }
 ]
 ```
 
-前端已按 `lastMessageAt` 排序和显示时间。
+### 消息历史
 
-### 2) 消息记录
-
-`GET /api/chat/messages?customerId=628118189951`
+`GET /api/chat/messages?customerId=...`
 
 ```json
 [
@@ -52,17 +70,9 @@
 ]
 ```
 
-前端已按 `message` 字段显示内容，并根据 `sender` 自动标记：
-
-- `customer` -> 客户
-- `ai` -> AI自动回复
-- 其它（如 `agent`）-> 人工客服
-
-### 3) 发送回复
+### 人工回复
 
 `POST /api/chat/reply`
-
-> 你的后端 `ManualReplyRequest` 需要字段：`from`、`customerId`、`message`。
 
 ```json
 {
@@ -72,45 +82,37 @@
 }
 ```
 
-> `POST /api/chat/read` 仍为可选接口，若后端没有该接口，前端会忽略失败。
->
-> 如果出现 `400 Bad Request`，请先检查页面左侧 `Reply From（业务号码ID）` 是否填写。
+### WebSocket
 
-## 在 VS Code 启动
+- 握手端点：`/ws`
+- 订阅主题：`/topic/agent/{agentRowId}`
+- 消息类型：`history` / `new_message`
 
-> ⚠️ 不要双击 `index.html` 用 `file://` 打开，否则会触发 CORS/同源限制。
+---
 
-### 方案 A：Python3
+## 本地运行
+
+> ⚠️ 不要双击 `index.html` 用 `file://` 打开。
+
+### Python3
 
 ```bash
 python3 -m http.server 5173
 ```
 
-### 方案 B：没有 Python3，用 Node.js
+### Node.js
 
 ```bash
 npx http-server -p 5173
 ```
 
-或：
+浏览器访问：`http://localhost:5173`
 
-```bash
-npx serve -l 5173
-```
+---
 
-### 方案 C：VS Code Live Server
+## CORS 配置建议
 
-- 安装扩展 **Live Server**
-- 右键 `index.html` -> **Open with Live Server**
-
-浏览器访问（示例）：
-
-- `http://localhost:5173`
-- 或 Live Server 的地址（如 `http://127.0.0.1:5500`）
-
-## CORS 建议
-
-后端需允许前端实际来源，例如：
+后端需放行前端来源，例如：
 
 - `http://localhost:5173`
 - `http://127.0.0.1:5500`
