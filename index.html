@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AITMK 客服聊天工作台</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h1>客户会话</h1>
+        </div>
+
+        <section class="auth-panel">
+          <h2>坐席登录</h2>
+          <form id="login-form" class="auth-form">
+            <input id="username" name="username" placeholder="用户名" required />
+            <input id="password" name="password" type="password" placeholder="密码" required />
+            <div class="auth-actions">
+              <button type="submit" id="login-btn">登录</button>
+              <button type="button" id="logout-btn" class="ghost-btn" disabled>登出</button>
+            </div>
+          </form>
+          <p id="auth-status" class="muted">未登录</p>
+        </section>
+
+        <section class="settings-bar">
+          <button type="button" id="open-api-settings" class="ghost-btn">服务地址设置</button>
+          <button type="button" id="open-from-settings" class="ghost-btn">业务号码设置</button>
+        </section>
+
+        <input id="apiBaseUrl" type="hidden" value="https://crm.wondermindedu.com:6153" />
+        <input id="replyFrom" type="hidden" value="1019964791197772" />
+
+        <ul id="customer-list" class="customer-list"></ul>
+      </aside>
+
+      <section class="chat-panel">
+        <header class="chat-header">
+          <h2 id="chat-title">未选择客户</h2>
+          <p id="conversation-window" class="muted">请先登录并选择客户</p>
+          <p id="connection-status" class="muted">等待连接</p>
+        </header>
+
+        <ul id="message-list" class="message-list"></ul>
+
+        <form id="message-form" class="message-form" aria-label="发送消息">
+          <textarea id="messageInput" rows="3" placeholder="输入人工回复内容..." required></textarea>
+          <button type="submit" id="send-btn" disabled>发送人工回复</button>
+        </form>
+      </section>
+    </main>
+
+    <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-content">
+        <h3 id="modal-title">设置</h3>
+        <label id="modal-label" for="modal-input">设置值</label>
+        <input id="modal-input" title="设置值" placeholder="请输入设置值" aria-label="设置值" />
+        <div class="modal-actions">
+          <button type="button" id="modal-cancel" class="ghost-btn">取消</button>
+          <button type="button" id="modal-save">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <template id="customer-item-template">
+      <li class="customer-item" role="button" tabindex="0">
+        <div class="line-1">
+          <span class="name"></span>
+          <span class="time muted"></span>
+        </div>
+        <div class="line-2">
+          <span class="preview muted"></span>
+          <span class="badge"></span>
+        </div>
+      </li>
+    </template>
+
+    <template id="message-template">
+      <li class="message-item">
+        <p class="meta"></p>
+        <p class="content"></p>
+      </li>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>
