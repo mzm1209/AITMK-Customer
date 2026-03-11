@@ -93,7 +93,7 @@
 - 订阅主题：`/topic/agent/{agentRowId}`
 - 消息类型：`history` / `new_message`
 
-> 说明：当前页面未默认加载第三方 CDN 的 SockJS/STOMP 脚本。若未注入这两个库，将无法接收实时更新，请在部署时提供 SockJS/STOMP 依赖。
+> 说明：前端内置了原生 WebSocket(STOMP) 直连能力（默认尝试 `/ws/websocket`），不再强依赖第三方 CDN 脚本。若页面额外注入 SockJS/STOMP，也会优先使用该方式连接。
 
 ---
 

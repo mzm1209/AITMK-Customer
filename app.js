@@ -50,6 +50,8 @@ const state = {
   },
   ws: {
     client: null,
+    nativeSocket: null,
+    reconnectTimer: null,
     connected: false,
   },
   modalKey: '',
@@ -479,23 +481,30 @@ function buildNetworkError(prefix, error) {
 function connectWebSocket() {
   disconnectWebSocket();
 
-  if (!window.StompJs || !window.SockJS || !state.auth.agentRowId) {
-    statusText.textContent = 'WebSocket 依赖缺失，无法接收实时更新';
+  if (!state.auth.agentRowId) {
+    statusText.textContent = '缺少 agentRowId，无法建立 WebSocket';
     return;
   }
 
-  const socketUrl = `${getApiBaseUrl()}/ws`;
+  // 优先使用全局 StompJs + SockJS（若页面自行注入）
+  if (window.StompJs && window.SockJS) {
+    connectWithExternalLibraries();
+    return;
+  }
 
+  // 无外部依赖时，使用内置 WebSocket + STOMP 直连
+  connectWithNativeWebSocket();
+}
+
+function connectWithExternalLibraries() {
+  const socketUrl = `${getApiBaseUrl()}/ws`;
   const client = new window.StompJs.Client({
     webSocketFactory: () => new window.SockJS(socketUrl),
     reconnectDelay: 5000,
     onConnect: () => {
       state.ws.connected = true;
       statusText.textContent = 'WebSocket 已连接';
-
-      client.subscribe(`/topic/agent/${state.auth.agentRowId}`, (frame) => {
-        handleWsMessage(frame.body);
-      });
+      client.subscribe(`/topic/agent/${state.auth.agentRowId}`, (frame) => handleWsMessage(frame.body));
     },
     onStompError: () => {
       state.ws.connected = false;
@@ -503,6 +512,7 @@ function connectWebSocket() {
     },
     onWebSocketClose: () => {
       state.ws.connected = false;
+      scheduleNativeReconnect();
     },
   });
 
@@ -510,11 +520,127 @@ function connectWebSocket() {
   client.activate();
 }
 
+function connectWithNativeWebSocket() {
+  const endpoints = [buildWsUrl('/ws/websocket')];
+  tryNativeEndpoints(endpoints, 0);
+}
+
+function tryNativeEndpoints(endpoints, index) {
+  if (index >= endpoints.length) {
+    state.ws.connected = false;
+    statusText.textContent = 'WebSocket 连接失败，请检查 /ws 端点';
+    scheduleNativeReconnect();
+    return;
+  }
+
+  const wsUrl = endpoints[index];
+  let opened = false;
+  const socket = new WebSocket(wsUrl);
+  state.ws.nativeSocket = socket;
+
+  socket.onopen = () => {
+    opened = true;
+    const connectFrame = `CONNECT
+accept-version:1.2
+host:${window.location.host}
+heart-beat:0,0
+
+ `;
+    socket.send(connectFrame);
+  };
+
+  socket.onmessage = (event) => {
+    const frame = parseStompFrame(event.data);
+    if (!frame) return;
+
+    if (frame.command === 'CONNECTED') {
+      state.ws.connected = true;
+      statusText.textContent = 'WebSocket 已连接（原生）';
+      const subscribeFrame = `SUBSCRIBE
+id:sub-0
+destination:/topic/agent/${state.auth.agentRowId}
+
+ `;
+      socket.send(subscribeFrame);
+      return;
+    }
+
+    if (frame.command === 'MESSAGE') {
+      handleWsMessage(frame.body || '');
+      return;
+    }
+
+    if (frame.command === 'ERROR') {
+      console.warn('STOMP error frame', frame.body);
+      statusText.textContent = 'WebSocket STOMP 错误，正在重连';
+      socket.close();
+    }
+  };
+
+  socket.onclose = () => {
+    state.ws.connected = false;
+    if (!opened) {
+      tryNativeEndpoints(endpoints, index + 1);
+      return;
+    }
+    scheduleNativeReconnect();
+  };
+
+  socket.onerror = () => {
+    if (!opened) return;
+    statusText.textContent = 'WebSocket 连接异常，正在重连';
+  };
+}
+
+function scheduleNativeReconnect() {
+  if (!state.auth.loggedIn) return;
+  clearTimeout(state.ws.reconnectTimer);
+  state.ws.reconnectTimer = setTimeout(() => connectWithNativeWebSocket(), 5000);
+}
+
+function buildWsUrl(path) {
+  const baseUrl = getApiBaseUrl();
+  const url = new URL(baseUrl);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.pathname = path;
+  url.search = '';
+  return url.toString();
+}
+
+function parseStompFrame(rawData) {
+  const text = String(rawData || '').replace(/\u0000+$/g, '');
+  if (!text.trim()) return null;
+
+  const [head, ...bodyParts] = text.split('\n\n');
+  const lines = head.split('\n');
+  const command = lines.shift();
+  const headers = {};
+
+  lines.forEach((line) => {
+    const idx = line.indexOf(':');
+    if (idx > 0) headers[line.slice(0, idx)] = line.slice(idx + 1);
+  });
+
+  return { command, headers, body: bodyParts.join('\n\n') };
+}
+
+
 function disconnectWebSocket() {
+  clearTimeout(state.ws.reconnectTimer);
+
   if (state.ws.client) {
     state.ws.client.deactivate();
   }
-  state.ws = { client: null, connected: false };
+
+  if (state.ws.nativeSocket) {
+    try {
+      state.ws.nativeSocket.close();
+    } catch (error) {
+      console.warn('native ws close failed', error);
+    }
+  }
+
+  state.ws = { client: null, nativeSocket: null, reconnectTimer: null, connected: false };
 }
 
 function handleWsMessage(payload) {
