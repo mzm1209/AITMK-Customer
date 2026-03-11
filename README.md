@@ -93,7 +93,20 @@
 - 订阅主题：`/topic/agent/{agentRowId}`
 - 消息类型：`history` / `new_message`
 
-> 说明：前端内置了原生 WebSocket(STOMP) 直连能力（默认尝试 `/ws/websocket`），不再强依赖第三方 CDN 脚本。若页面额外注入 SockJS/STOMP，也会优先使用该方式连接。
+> 说明：前端优先尝试 `/ws`，失败后回退 `/ws/websocket`。连接成功后会自动订阅 `/topic/agent/{agentRowId}` 并调用 `/api/agent/ws/reconnected`。
+
+
+### WebSocket 重连补发
+
+`POST /api/agent/ws/reconnected`
+
+```json
+{
+  "agentRowId": "abc123"
+}
+```
+
+前端在 STOMP 连接成功并完成订阅后会自动调用该接口，拉取服务端失败缓存消息。
 
 ---
 

@@ -43,6 +43,7 @@ const state = {
   lastCustomerSnapshot: [],
   customersCache: [],
   messagesCache: new Map(),
+  wsDedupSet: new Set(),
   auth: {
     loggedIn: false,
     username: '',
@@ -135,6 +136,7 @@ async function onLogout() {
   state.seenMessageIds = new Set();
   state.customersCache = [];
   state.messagesCache.clear();
+  state.wsDedupSet.clear();
   messageList.innerHTML = '';
   customerListEl.innerHTML = '';
   chatTitle.textContent = '未选择客户';
@@ -480,6 +482,7 @@ function buildNetworkError(prefix, error) {
 
 function connectWebSocket() {
   disconnectWebSocket();
+  statusText.textContent = 'WebSocket 连接中...';
 
   if (!state.auth.agentRowId) {
     statusText.textContent = '缺少 agentRowId，无法建立 WebSocket';
@@ -505,6 +508,7 @@ function connectWithExternalLibraries() {
       state.ws.connected = true;
       statusText.textContent = 'WebSocket 已连接';
       client.subscribe(`/topic/agent/${state.auth.agentRowId}`, (frame) => handleWsMessage(frame.body));
+      notifyWsReconnected();
     },
     onStompError: () => {
       state.ws.connected = false;
@@ -512,7 +516,7 @@ function connectWithExternalLibraries() {
     },
     onWebSocketClose: () => {
       state.ws.connected = false;
-      scheduleNativeReconnect();
+      scheduleWsReconnect();
     },
   });
 
@@ -521,7 +525,7 @@ function connectWithExternalLibraries() {
 }
 
 function connectWithNativeWebSocket() {
-  const endpoints = [buildWsUrl('/ws/websocket')];
+  const endpoints = [buildWsUrl('/ws'), buildWsUrl('/ws/websocket')];
   tryNativeEndpoints(endpoints, 0);
 }
 
@@ -529,7 +533,7 @@ function tryNativeEndpoints(endpoints, index) {
   if (index >= endpoints.length) {
     state.ws.connected = false;
     statusText.textContent = 'WebSocket 连接失败，请检查 /ws 端点';
-    scheduleNativeReconnect();
+    scheduleWsReconnect();
     return;
   }
 
@@ -545,7 +549,7 @@ accept-version:1.2
 host:${window.location.host}
 heart-beat:0,0
 
- `;
+\u0000`;
     socket.send(connectFrame);
   };
 
@@ -555,13 +559,14 @@ heart-beat:0,0
 
     if (frame.command === 'CONNECTED') {
       state.ws.connected = true;
-      statusText.textContent = 'WebSocket 已连接（原生）';
+      statusText.textContent = 'WebSocket 已连接';
       const subscribeFrame = `SUBSCRIBE
 id:sub-0
 destination:/topic/agent/${state.auth.agentRowId}
 
- `;
+\u0000`;
       socket.send(subscribeFrame);
+      notifyWsReconnected();
       return;
     }
 
@@ -583,7 +588,7 @@ destination:/topic/agent/${state.auth.agentRowId}
       tryNativeEndpoints(endpoints, index + 1);
       return;
     }
-    scheduleNativeReconnect();
+    scheduleWsReconnect();
   };
 
   socket.onerror = () => {
@@ -592,10 +597,10 @@ destination:/topic/agent/${state.auth.agentRowId}
   };
 }
 
-function scheduleNativeReconnect() {
+function scheduleWsReconnect() {
   if (!state.auth.loggedIn) return;
   clearTimeout(state.ws.reconnectTimer);
-  state.ws.reconnectTimer = setTimeout(() => connectWithNativeWebSocket(), 5000);
+  state.ws.reconnectTimer = setTimeout(() => connectWebSocket(), 2000);
 }
 
 function buildWsUrl(path) {
@@ -649,30 +654,62 @@ function handleWsMessage(payload) {
     const type = data.type;
     const customerId = data.customerPhone || data.customerId;
 
+    if (!customerId) return;
+
     if (type === 'history' && Array.isArray(data.messages)) {
       const normalized = normalizeMessages(data.messages);
-      if (customerId) {
-        state.messagesCache.set(customerId, normalized);
-      }
+      state.messagesCache.set(customerId, dedupeMessages(normalized));
 
       if (customerId === state.currentCustomerId) {
         state.seenMessageIds = new Set();
         messageList.innerHTML = '';
-        renderMessages(normalized);
+        renderMessages(state.messagesCache.get(customerId));
       }
 
       loadCustomers(true);
       return;
     }
 
-    if (type === 'new_message') {
-      loadCustomers();
+    if (type === 'new_message' && Array.isArray(data.messages)) {
+      const incoming = normalizeMessages(data.messages);
+      const merged = mergeIncomingMessages(customerId, incoming);
+      state.messagesCache.set(customerId, merged);
+
       if (customerId === state.currentCustomerId) {
-        loadMessages();
+        renderMessages(incoming);
       }
+
+      loadCustomers();
     }
   } catch (error) {
     console.warn('invalid ws payload', error);
+  }
+}
+
+function mergeIncomingMessages(customerId, incomingMessages) {
+  const existing = state.messagesCache.get(customerId) || [];
+  return dedupeMessages([...existing, ...incomingMessages]);
+}
+
+function dedupeMessages(messages) {
+  const seen = new Set();
+  return messages.filter((item) => {
+    const key = `${item.sender}-${item.timestamp}-${item.content}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function notifyWsReconnected() {
+  try {
+    await fetch(`${getApiBaseUrl()}/api/agent/ws/reconnected`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ agentRowId: state.auth.agentRowId }),
+    });
+  } catch (error) {
+    console.warn('ws reconnected notify failed', error);
   }
 }
 
