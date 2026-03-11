@@ -43,6 +43,7 @@ const state = {
   lastCustomerSnapshot: [],
   customersCache: [],
   messagesCache: new Map(),
+  wsUnreadCounts: new Map(),
   wsDedupSet: new Set(),
   auth: {
     loggedIn: false,
@@ -136,6 +137,7 @@ async function onLogout() {
   state.seenMessageIds = new Set();
   state.customersCache = [];
   state.messagesCache.clear();
+  state.wsUnreadCounts.clear();
   state.wsDedupSet.clear();
   messageList.innerHTML = '';
   customerListEl.innerHTML = '';
@@ -302,6 +304,8 @@ function renderCustomers(customers) {
       const preview = item.lastMessage || item.message || '（无最近消息）';
       const time = formatTime(item.lastMessageAt || item.lastTimestamp || item.timestamp);
       const unread = Number(item.unreadCount || 0);
+      const wsUnread = Number(state.wsUnreadCounts.get(customerId) || 0);
+      const unreadTotal = wsUnread > 0 ? wsUnread : unread;
       const over24h = isOver24Hours(item);
 
       li.dataset.customerId = customerId;
@@ -313,9 +317,10 @@ function renderCustomers(customers) {
       if (!canCustomerReply(item)) li.classList.add('readonly');
 
       const badge = li.querySelector('.badge');
-      if (unread > 0) {
+      if (unreadTotal > 0) {
         badge.classList.add('show');
-        badge.textContent = unread > 99 ? '99+' : String(unread);
+        badge.classList.toggle('ws-unread', wsUnread > 0);
+        badge.textContent = wsUnread > 0 ? '' : (unreadTotal > 99 ? '99+' : String(unreadTotal));
       }
 
       if (customerId === state.currentCustomerId) li.classList.add('active');
@@ -335,6 +340,8 @@ function renderCustomers(customers) {
 async function selectCustomer(customer) {
   const customerId = customer.customerId || customer.from || customer.waId;
   state.currentCustomerId = customerId;
+  state.wsUnreadCounts.delete(customerId);
+  renderCustomers(state.customersCache);
   state.seenMessageIds = new Set();
   messageList.innerHTML = '';
 
@@ -664,6 +671,8 @@ function handleWsMessage(payload) {
         state.seenMessageIds = new Set();
         messageList.innerHTML = '';
         renderMessages(state.messagesCache.get(customerId));
+      } else {
+        markCustomerWsUnread(customerId);
       }
 
       loadCustomers(true);
@@ -677,6 +686,8 @@ function handleWsMessage(payload) {
 
       if (customerId === state.currentCustomerId) {
         renderMessages(incoming);
+      } else {
+        markCustomerWsUnread(customerId);
       }
 
       loadCustomers();
@@ -684,6 +695,11 @@ function handleWsMessage(payload) {
   } catch (error) {
     console.warn('invalid ws payload', error);
   }
+}
+
+function markCustomerWsUnread(customerId) {
+  const current = Number(state.wsUnreadCounts.get(customerId) || 0);
+  state.wsUnreadCounts.set(customerId, current + 1);
 }
 
 function mergeIncomingMessages(customerId, incomingMessages) {
