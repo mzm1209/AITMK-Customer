@@ -40,11 +40,13 @@ const messageTemplate = document.getElementById('message-template');
 const state = {
   currentCustomerId: '',
   seenMessageIds: new Set(),
+
   lastCustomerSnapshot: [],
   customersCache: [],
   messagesCache: new Map(),
   wsUnreadCounts: new Map(),
   wsDedupSet: new Set(),
+
   auth: {
     loggedIn: false,
     username: '',
@@ -54,6 +56,7 @@ const state = {
     client: null,
     nativeSocket: null,
     reconnectTimer: null,
+
     connected: false,
   },
   modalKey: '',
@@ -105,7 +108,9 @@ async function onLogin(event) {
 
   try {
     const result = await login(username, password);
+
     const agentRowId = result.accountRowId || result.agentRowId || result.agentId || result.rowId || result.data?.accountRowId || result.data?.agentRowId;
+
 
     if (!agentRowId) {
       throw new Error('登录成功但未返回 agentRowId');

@@ -44,6 +44,7 @@
   {
     "customerId": "628118189951",
     "lastMessage": "...",
+
     "lastMessageAt": "2026-03-04T07:59:52.733640637Z",
     "serviceStatus": "服务中",
     "canReply": true
@@ -53,6 +54,7 @@
 
 
 > 会话状态为 `已关闭` 或超出24小时时，前端展示只读样式，允许查看历史消息但禁用人工回复。
+
 
 ### 消息历史
 
@@ -93,6 +95,7 @@
 - 订阅主题：`/topic/agent/{agentRowId}`
 - 消息类型：`history` / `new_message`
 
+
 > 说明：前端优先尝试 `/ws`，失败后回退 `/ws/websocket`。连接成功后会自动订阅 `/topic/agent/{agentRowId}` 并调用 `/api/agent/ws/reconnected`。
 
 
@@ -107,6 +110,7 @@
 ```
 
 前端在 STOMP 连接成功并完成订阅后会自动调用该接口，拉取服务端失败缓存消息。
+
 
 ---
 
