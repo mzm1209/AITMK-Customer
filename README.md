@@ -3,8 +3,8 @@
 基于当前服务端实现，本前端已支持：
 
 1. 坐席登录 / 登出（`/api/auth/login`、`/api/auth/logout`）
-2. 登录后同步客户会话列表与历史聊天记录
-3. WebSocket 实时订阅（`/ws` + `/topic/agent/{agentRowId}`）
+2. 登录后同步当前坐席服务客户列表与历史聊天记录
+3. 登录后通过 WebSocket 实时更新（不再使用轮询同步）
 4. 24 小时规则：超时会话列表灰色显示，可查看历史，但禁用人工回复
 5. Spring Boot 地址弹窗设置（默认：`https://crm.wondermindedu.com:6153`）
 6. 业务号码弹窗设置（默认：`1019964791197772`）
@@ -35,19 +35,26 @@
 }
 ```
 
-### 客户列表
+### 当前坐席服务客户列表
 
-`GET /api/chat/customers`
+`GET /api/chat/customers/serving?agentRowId=...`
 
 ```json
 [
   {
     "customerId": "628118189951",
     "lastMessage": "...",
-    "lastMessageAt": "2026-03-04T07:59:52.733640637Z"
+
+    "lastMessageAt": "2026-03-04T07:59:52.733640637Z",
+    "serviceStatus": "服务中",
+    "canReply": true
   }
 ]
 ```
+
+
+> 会话状态为 `已关闭` 或超出24小时时，前端展示只读样式，允许查看历史消息但禁用人工回复。
+
 
 ### 消息历史
 
@@ -88,7 +95,22 @@
 - 订阅主题：`/topic/agent/{agentRowId}`
 - 消息类型：`history` / `new_message`
 
-> 说明：当前页面未默认加载第三方 CDN 的 SockJS/STOMP 脚本。若未注入这两个库，将自动使用轮询模式，不影响基础客服功能。
+
+> 说明：前端优先尝试 `/ws`，失败后回退 `/ws/websocket`。连接成功后会自动订阅 `/topic/agent/{agentRowId}` 并调用 `/api/agent/ws/reconnected`。
+
+
+### WebSocket 重连补发
+
+`POST /api/agent/ws/reconnected`
+
+```json
+{
+  "agentRowId": "abc123"
+}
+```
+
+前端在 STOMP 连接成功并完成订阅后会自动调用该接口，拉取服务端失败缓存消息。
+
 
 ---
 

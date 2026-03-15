@@ -40,11 +40,13 @@ const messageTemplate = document.getElementById('message-template');
 const state = {
   currentCustomerId: '',
   seenMessageIds: new Set(),
-  customersPollTimer: null,
-  messagesPollTimer: null,
+
   lastCustomerSnapshot: [],
   customersCache: [],
   messagesCache: new Map(),
+  wsUnreadCounts: new Map(),
+  wsDedupSet: new Set(),
+
   auth: {
     loggedIn: false,
     username: '',
@@ -52,6 +54,9 @@ const state = {
   },
   ws: {
     client: null,
+    nativeSocket: null,
+    reconnectTimer: null,
+
     connected: false,
   },
   modalKey: '',
@@ -103,7 +108,9 @@ async function onLogin(event) {
 
   try {
     const result = await login(username, password);
-    const agentRowId = result.agentRowId || result.agentId || result.rowId || result.data?.agentRowId;
+
+    const agentRowId = result.accountRowId || result.agentRowId || result.agentId || result.rowId || result.data?.accountRowId || result.data?.agentRowId;
+
 
     if (!agentRowId) {
       throw new Error('登录成功但未返回 agentRowId');
@@ -130,12 +137,13 @@ async function onLogout() {
   }
 
   disconnectWebSocket();
-  stopPolling();
 
   state.currentCustomerId = '';
   state.seenMessageIds = new Set();
   state.customersCache = [];
   state.messagesCache.clear();
+  state.wsUnreadCounts.clear();
+  state.wsDedupSet.clear();
   messageList.innerHTML = '';
   customerListEl.innerHTML = '';
   chatTitle.textContent = '未选择客户';
@@ -169,21 +177,7 @@ async function syncAllHistory() {
     }
   }
 
-  startPolling();
   statusText.textContent = `同步完成：${customers.length} 个客户`;
-}
-
-function startPolling() {
-  stopPolling();
-  state.customersPollTimer = setInterval(loadCustomers, 5000);
-  state.messagesPollTimer = setInterval(loadMessages, 4000);
-}
-
-function stopPolling() {
-  if (state.customersPollTimer) clearInterval(state.customersPollTimer);
-  if (state.messagesPollTimer) clearInterval(state.messagesPollTimer);
-  state.customersPollTimer = null;
-  state.messagesPollTimer = null;
 }
 
 async function onSendMessage(event) {
@@ -278,7 +272,7 @@ async function loadCustomers(forceRender = false) {
   if (!state.auth.loggedIn) return;
 
   try {
-    const customers = await fetchCustomers();
+    const customers = await fetchServingCustomers(state.auth.agentRowId);
     state.customersCache = customers;
 
     const snapshot = JSON.stringify(customers);
@@ -315,6 +309,8 @@ function renderCustomers(customers) {
       const preview = item.lastMessage || item.message || '（无最近消息）';
       const time = formatTime(item.lastMessageAt || item.lastTimestamp || item.timestamp);
       const unread = Number(item.unreadCount || 0);
+      const wsUnread = Number(state.wsUnreadCounts.get(customerId) || 0);
+      const unreadTotal = wsUnread > 0 ? wsUnread : unread;
       const over24h = isOver24Hours(item);
 
       li.dataset.customerId = customerId;
@@ -323,11 +319,13 @@ function renderCustomers(customers) {
       li.querySelector('.time').textContent = time;
 
       if (over24h) li.classList.add('over-24h');
+      if (!canCustomerReply(item)) li.classList.add('readonly');
 
       const badge = li.querySelector('.badge');
-      if (unread > 0) {
+      if (unreadTotal > 0) {
         badge.classList.add('show');
-        badge.textContent = unread > 99 ? '99+' : String(unread);
+        badge.classList.toggle('ws-unread', wsUnread > 0);
+        badge.textContent = wsUnread > 0 ? '' : (unreadTotal > 99 ? '99+' : String(unreadTotal));
       }
 
       if (customerId === state.currentCustomerId) li.classList.add('active');
@@ -347,6 +345,8 @@ function renderCustomers(customers) {
 async function selectCustomer(customer) {
   const customerId = customer.customerId || customer.from || customer.waId;
   state.currentCustomerId = customerId;
+  state.wsUnreadCounts.delete(customerId);
+  renderCustomers(state.customersCache);
   state.seenMessageIds = new Set();
   messageList.innerHTML = '';
 
@@ -362,15 +362,23 @@ async function selectCustomer(customer) {
 function updateWindowHint(customer) {
   const lastCustomerTime = customer.lastCustomerMessageTime || customer.lastMessageAt;
   const over24h = isOver24Hours(customer);
+  const serviceStatus = customer.serviceStatus || '未知状态';
 
-  if (over24h) {
+  if (!canCustomerReply(customer)) {
     windowText.className = 'muted warning';
-    windowText.textContent = `会话超过24小时（最后客户消息：${formatTime(lastCustomerTime)}）`; 
-    return;
+    if (serviceStatus === '已关闭') {
+      windowText.textContent = `当前会话状态：已关闭（可查看历史，不可人工回复）`;
+      return;
+    }
+
+    if (over24h) {
+      windowText.textContent = `会话超过24小时（最后客户消息：${formatTime(lastCustomerTime)}），不可人工回复`;
+      return;
+    }
   }
 
   windowText.className = 'muted';
-  windowText.textContent = '24小时会话窗口内，可发送人工消息';
+  windowText.textContent = `当前会话状态：${serviceStatus}（可人工回复）`;
 }
 
 function updateSendAvailability(customer) {
@@ -379,7 +387,7 @@ function updateSendAvailability(customer) {
     return;
   }
 
-  sendBtn.disabled = isOver24Hours(customer);
+  sendBtn.disabled = !canCustomerReply(customer);
 }
 
 async function loadMessages() {
@@ -440,6 +448,12 @@ function labelByMessage(item) {
   return '人工客服';
 }
 
+function canCustomerReply(customer) {
+  if (customer?.canReply === false) return false;
+  if (customer?.serviceStatus === '已关闭') return false;
+  return !isOver24Hours(customer);
+}
+
 function isOver24Hours(customer) {
   if (customer.within24h === false) return true;
   if (customer.within24h === true) return false;
@@ -480,31 +494,41 @@ function buildNetworkError(prefix, error) {
 
 function connectWebSocket() {
   disconnectWebSocket();
+  statusText.textContent = 'WebSocket 连接中...';
 
-  if (!window.StompJs || !window.SockJS || !state.auth.agentRowId) {
-    statusText.textContent = 'WebSocket 依赖加载失败，已使用轮询兜底';
+  if (!state.auth.agentRowId) {
+    statusText.textContent = '缺少 agentRowId，无法建立 WebSocket';
     return;
   }
 
-  const socketUrl = `${getApiBaseUrl()}/ws`;
+  // 优先使用全局 StompJs + SockJS（若页面自行注入）
+  if (window.StompJs && window.SockJS) {
+    connectWithExternalLibraries();
+    return;
+  }
 
+  // 无外部依赖时，使用内置 WebSocket + STOMP 直连
+  connectWithNativeWebSocket();
+}
+
+function connectWithExternalLibraries() {
+  const socketUrl = `${getApiBaseUrl()}/ws`;
   const client = new window.StompJs.Client({
     webSocketFactory: () => new window.SockJS(socketUrl),
     reconnectDelay: 5000,
     onConnect: () => {
       state.ws.connected = true;
       statusText.textContent = 'WebSocket 已连接';
-
-      client.subscribe(`/topic/agent/${state.auth.agentRowId}`, (frame) => {
-        handleWsMessage(frame.body);
-      });
+      client.subscribe(`/topic/agent/${state.auth.agentRowId}`, (frame) => handleWsMessage(frame.body));
+      notifyWsReconnected();
     },
     onStompError: () => {
       state.ws.connected = false;
-      statusText.textContent = 'WebSocket 连接异常，已使用轮询';
+      statusText.textContent = 'WebSocket 连接异常，请检查服务';
     },
     onWebSocketClose: () => {
       state.ws.connected = false;
+      scheduleWsReconnect();
     },
   });
 
@@ -512,11 +536,128 @@ function connectWebSocket() {
   client.activate();
 }
 
+function connectWithNativeWebSocket() {
+  const endpoints = [buildWsUrl('/ws'), buildWsUrl('/ws/websocket')];
+  tryNativeEndpoints(endpoints, 0);
+}
+
+function tryNativeEndpoints(endpoints, index) {
+  if (index >= endpoints.length) {
+    state.ws.connected = false;
+    statusText.textContent = 'WebSocket 连接失败，请检查 /ws 端点';
+    scheduleWsReconnect();
+    return;
+  }
+
+  const wsUrl = endpoints[index];
+  let opened = false;
+  const socket = new WebSocket(wsUrl);
+  state.ws.nativeSocket = socket;
+
+  socket.onopen = () => {
+    opened = true;
+    const connectFrame = `CONNECT
+accept-version:1.2
+host:${window.location.host}
+heart-beat:0,0
+
+\u0000`;
+    socket.send(connectFrame);
+  };
+
+  socket.onmessage = (event) => {
+    const frame = parseStompFrame(event.data);
+    if (!frame) return;
+
+    if (frame.command === 'CONNECTED') {
+      state.ws.connected = true;
+      statusText.textContent = 'WebSocket 已连接';
+      const subscribeFrame = `SUBSCRIBE
+id:sub-0
+destination:/topic/agent/${state.auth.agentRowId}
+
+\u0000`;
+      socket.send(subscribeFrame);
+      notifyWsReconnected();
+      return;
+    }
+
+    if (frame.command === 'MESSAGE') {
+      handleWsMessage(frame.body || '');
+      return;
+    }
+
+    if (frame.command === 'ERROR') {
+      console.warn('STOMP error frame', frame.body);
+      statusText.textContent = 'WebSocket STOMP 错误，正在重连';
+      socket.close();
+    }
+  };
+
+  socket.onclose = () => {
+    state.ws.connected = false;
+    if (!opened) {
+      tryNativeEndpoints(endpoints, index + 1);
+      return;
+    }
+    scheduleWsReconnect();
+  };
+
+  socket.onerror = () => {
+    if (!opened) return;
+    statusText.textContent = 'WebSocket 连接异常，正在重连';
+  };
+}
+
+function scheduleWsReconnect() {
+  if (!state.auth.loggedIn) return;
+  clearTimeout(state.ws.reconnectTimer);
+  state.ws.reconnectTimer = setTimeout(() => connectWebSocket(), 2000);
+}
+
+function buildWsUrl(path) {
+  const baseUrl = getApiBaseUrl();
+  const url = new URL(baseUrl);
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.pathname = path;
+  url.search = '';
+  return url.toString();
+}
+
+function parseStompFrame(rawData) {
+  const text = String(rawData || '').replace(/\u0000+$/g, '');
+  if (!text.trim()) return null;
+
+  const [head, ...bodyParts] = text.split('\n\n');
+  const lines = head.split('\n');
+  const command = lines.shift();
+  const headers = {};
+
+  lines.forEach((line) => {
+    const idx = line.indexOf(':');
+    if (idx > 0) headers[line.slice(0, idx)] = line.slice(idx + 1);
+  });
+
+  return { command, headers, body: bodyParts.join('\n\n') };
+}
+
+
 function disconnectWebSocket() {
+  clearTimeout(state.ws.reconnectTimer);
+
   if (state.ws.client) {
     state.ws.client.deactivate();
   }
-  state.ws = { client: null, connected: false };
+
+  if (state.ws.nativeSocket) {
+    try {
+      state.ws.nativeSocket.close();
+    } catch (error) {
+      console.warn('native ws close failed', error);
+    }
+  }
+
+  state.ws = { client: null, nativeSocket: null, reconnectTimer: null, connected: false };
 }
 
 function handleWsMessage(payload) {
@@ -525,30 +666,71 @@ function handleWsMessage(payload) {
     const type = data.type;
     const customerId = data.customerPhone || data.customerId;
 
+    if (!customerId) return;
+
     if (type === 'history' && Array.isArray(data.messages)) {
       const normalized = normalizeMessages(data.messages);
-      if (customerId) {
-        state.messagesCache.set(customerId, normalized);
-      }
+      state.messagesCache.set(customerId, dedupeMessages(normalized));
 
       if (customerId === state.currentCustomerId) {
         state.seenMessageIds = new Set();
         messageList.innerHTML = '';
-        renderMessages(normalized);
+        renderMessages(state.messagesCache.get(customerId));
+      } else {
+        markCustomerWsUnread(customerId);
       }
 
       loadCustomers(true);
       return;
     }
 
-    if (type === 'new_message') {
-      loadCustomers();
+    if (type === 'new_message' && Array.isArray(data.messages)) {
+      const incoming = normalizeMessages(data.messages);
+      const merged = mergeIncomingMessages(customerId, incoming);
+      state.messagesCache.set(customerId, merged);
+
       if (customerId === state.currentCustomerId) {
-        loadMessages();
+        renderMessages(incoming);
+      } else {
+        markCustomerWsUnread(customerId);
       }
+
+      loadCustomers();
     }
   } catch (error) {
     console.warn('invalid ws payload', error);
+  }
+}
+
+function markCustomerWsUnread(customerId) {
+  const current = Number(state.wsUnreadCounts.get(customerId) || 0);
+  state.wsUnreadCounts.set(customerId, current + 1);
+}
+
+function mergeIncomingMessages(customerId, incomingMessages) {
+  const existing = state.messagesCache.get(customerId) || [];
+  return dedupeMessages([...existing, ...incomingMessages]);
+}
+
+function dedupeMessages(messages) {
+  const seen = new Set();
+  return messages.filter((item) => {
+    const key = `${item.sender}-${item.timestamp}-${item.content}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function notifyWsReconnected() {
+  try {
+    await fetch(`${getApiBaseUrl()}/api/agent/ws/reconnected`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ agentRowId: state.auth.agentRowId }),
+    });
+  } catch (error) {
+    console.warn('ws reconnected notify failed', error);
   }
 }
 
@@ -574,8 +756,8 @@ async function logout(agentRowId) {
   });
 }
 
-async function fetchCustomers() {
-  const url = `${getApiBaseUrl()}/api/chat/customers`;
+async function fetchServingCustomers(agentRowId) {
+  const url = `${getApiBaseUrl()}/api/chat/customers/serving?agentRowId=${encodeURIComponent(agentRowId)}`;
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
