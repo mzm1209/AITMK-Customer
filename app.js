@@ -496,21 +496,17 @@ async function selectCustomer(customer) {
 }
 
 function updateWindowHint(customer) {
-  const lastCustomerTime = customer.lastCustomerMessageTime || customer.lastMessageAt;
-  const over24h = isOver24Hours(customer);
   const serviceStatus = customer.serviceStatus || '未知状态';
 
   if (!canCustomerReply(customer)) {
     windowText.className = 'muted warning';
     if (serviceStatus === '已关闭') {
-      windowText.textContent = `当前会话状态：已关闭（可查看历史，不可人工回复）`;
+      windowText.textContent = '当前会话状态：已关闭（可查看历史，不可人工回复）';
       return;
     }
 
-    if (over24h) {
-      windowText.textContent = `会话超过24小时（最后客户消息：${formatTime(lastCustomerTime)}），不可人工回复`;
-      return;
-    }
+    windowText.textContent = `当前会话状态：${serviceStatus}（由服务端规则判定为不可回复）`;
+    return;
   }
 
   windowText.className = 'muted';
@@ -590,20 +586,12 @@ function labelByMessage(item) {
 function canCustomerReply(customer) {
   if (customer?.canReply === false) return false;
   if (customer?.serviceStatus === '已关闭') return false;
-  return !isOver24Hours(customer);
+  if (customer?.within24h === false) return false;
+  return true;
 }
 
 function isOver24Hours(customer) {
-  if (customer.within24h === false) return true;
-  if (customer.within24h === true) return false;
-
-  const ts = customer.lastCustomerMessageTime || customer.lastMessageAt || customer.lastTimestamp;
-  if (!ts) return false;
-
-  const last = new Date(ts);
-  if (Number.isNaN(last.getTime())) return false;
-
-  return Date.now() - last.getTime() > 24 * 60 * 60 * 1000;
+  return customer?.within24h === false;
 }
 
 function getCustomerById(customerId) {
