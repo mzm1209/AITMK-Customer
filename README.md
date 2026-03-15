@@ -126,6 +126,20 @@
 
 > 规则：后端会校验 24 小时窗口，且 `mediaId` 与 `mediaUrl` 至少提供一个。前端“上传并发送附件”采用先上传获取 `mediaId`，再调用 `/reply/media`。
 
+
+### 前端上传格式限制（已内置校验）
+
+发送附件前，前端会根据“附件类型”校验文件扩展名/MIME/大小：
+
+- `image`：`.jpg/.jpeg/.png`，`image/jpeg`、`image/png`，最大 **5MB**。
+- `audio`：`.aac/.amr/.mp3/.m4a/.ogg`，`audio/aac`、`audio/amr`、`audio/mpeg`、`audio/mp4`、`audio/ogg`，最大 **16MB**。
+- `video`：`.3gp/.mp4`，`video/3gpp`、`video/mp4`，最大 **16MB**。
+- `document`：`.txt/.xls/.xlsx/.doc/.docx/.ppt/.pptx/.pdf`，对应 Office/PDF/TXT MIME，最大 **100MB**。
+
+> 说明：
+> - `.webp` 贴图发送不在当前“附件发送”范围内（当前仅 image/video/audio/document 四类）。
+> - 浏览器可能出现 `file.type` 为空的情况，前端会以扩展名作为兜底校验。
+
 ### WebSocket
 
 - 握手端点：`/ws`

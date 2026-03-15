@@ -8,6 +8,42 @@ const DEFAULTS = {
   replyFrom: '1019964791197772',
 };
 
+const MEDIA_RULES = {
+  image: {
+    maxBytes: 5 * 1024 * 1024,
+    exts: ['.jpg', '.jpeg', '.png'],
+    mimes: ['image/jpeg', 'image/png'],
+    hint: '支持 jpg/jpeg/png，最大 5MB',
+  },
+  audio: {
+    maxBytes: 16 * 1024 * 1024,
+    exts: ['.aac', '.amr', '.mp3', '.m4a', '.ogg'],
+    mimes: ['audio/aac', 'audio/amr', 'audio/mpeg', 'audio/mp4', 'audio/ogg'],
+    hint: '支持 aac/amr/mp3/m4a/ogg，最大 16MB',
+  },
+  video: {
+    maxBytes: 16 * 1024 * 1024,
+    exts: ['.3gp', '.mp4'],
+    mimes: ['video/3gpp', 'video/mp4'],
+    hint: '支持 3gp/mp4，最大 16MB',
+  },
+  document: {
+    maxBytes: 100 * 1024 * 1024,
+    exts: ['.txt', '.xls', '.xlsx', '.doc', '.docx', '.ppt', '.pptx', '.pdf'],
+    mimes: [
+      'text/plain',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/pdf',
+    ],
+    hint: '支持 txt/xls/xlsx/doc/docx/ppt/pptx/pdf，最大 100MB',
+  },
+};
+
 const customerListEl = document.getElementById('customer-list');
 const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('messageInput');
@@ -21,6 +57,7 @@ const mediaTypeInput = document.getElementById('mediaType');
 const mediaFileInput = document.getElementById('mediaFile');
 const mediaCaptionInput = document.getElementById('mediaCaption');
 const sendMediaBtn = document.getElementById('send-media-btn');
+const mediaRuleHint = document.getElementById('media-rule-hint');
 
 const loginForm = document.getElementById('login-form');
 const loginBtn = document.getElementById('login-btn');
@@ -75,6 +112,7 @@ function init() {
   }
 
   bindEvents();
+  syncMediaFileAcceptByType();
   setLoggedOutState('未登录');
 }
 
@@ -83,6 +121,7 @@ function bindEvents() {
   logoutBtn.addEventListener('click', onLogout);
   messageForm.addEventListener('submit', onSendMessage);
   mediaForm.addEventListener('submit', onSendMedia);
+  mediaTypeInput.addEventListener('change', syncMediaFileAcceptByType);
 
   openApiSettingsBtn.addEventListener('click', () => openSettingsModal('apiBaseUrl'));
   openFromSettingsBtn.addEventListener('click', () => openSettingsModal('replyFrom'));
@@ -239,6 +278,12 @@ async function onSendMedia(event) {
     return;
   }
 
+  const mediaValidation = validateMediaFile(mediaType, file);
+  if (!mediaValidation.ok) {
+    statusText.textContent = mediaValidation.message;
+    return;
+  }
+
   sendMediaBtn.disabled = true;
   statusText.textContent = '附件上传中...';
 
@@ -270,6 +315,37 @@ async function onSendMedia(event) {
   } finally {
     updateSendAvailability(getCustomerById(state.currentCustomerId));
   }
+}
+
+
+function syncMediaFileAcceptByType() {
+  const rule = MEDIA_RULES[mediaTypeInput.value] || MEDIA_RULES.image;
+  mediaFileInput.accept = rule.exts.join(',');
+  mediaRuleHint.textContent = `支持格式：${rule.hint}`;
+}
+
+function validateMediaFile(mediaType, file) {
+  const rule = MEDIA_RULES[mediaType];
+  if (!rule) {
+    return { ok: false, message: '不支持的附件类型' };
+  }
+
+  const name = String(file.name || '').toLowerCase();
+  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : '';
+  const mime = String(file.type || '').toLowerCase();
+
+  const extAllowed = rule.exts.includes(ext);
+  const mimeAllowed = !mime || rule.mimes.includes(mime);
+
+  if (!extAllowed || !mimeAllowed) {
+    return { ok: false, message: `文件格式不支持：${rule.hint}` };
+  }
+
+  if (file.size > rule.maxBytes) {
+    return { ok: false, message: `文件过大：${rule.hint}` };
+  }
+
+  return { ok: true };
 }
 
 function setFileProtocolWarning() {
