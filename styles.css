@@ -54,7 +54,7 @@ p {
   height: 420px;
   border-radius: 999px;
   filter: blur(80px);
-  opacity: 0.45;
+  opacity: 0.22;
   pointer-events: none;
   z-index: 0;
 }
@@ -107,7 +107,7 @@ p {
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 0.8rem;
-  background: var(--gradient-soft);
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
 }
 
 .sidebar-header {
@@ -184,6 +184,7 @@ p {
 .settings-wrap {
   display: grid;
   gap: 0.55rem;
+  background: #fff;
 }
 
 input,
@@ -364,6 +365,33 @@ button:disabled {
   font-weight: 800;
   letter-spacing: -0.02em;
 }
+
+.workspace-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.2rem 0 0.1rem;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  width: auto;
+  min-width: 92px;
+  padding: 0.45rem 0.7rem;
+  font-size: 0.82rem;
+  border-radius: 8px;
+}
+
+.action-btn.danger {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fff;
+}
+
+.action-btn.danger:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
 
 .message-list {
   list-style: none;

@@ -15,10 +15,10 @@
       <aside class="sidebar">
         <div class="sidebar-header">
           <div>
-            <h1>客户会话</h1>
-            <p class="panel-subtitle">Corporate Trust Workspace</p>
+            <h1>客服工作台</h1>
+            <p class="panel-subtitle">1 个活跃会话</p>
           </div>
-          <span class="status-pill">Online Desk</span>
+          <span class="status-pill">服务中</span>
         </div>
 
         <section class="auth-panel">
@@ -36,10 +36,10 @@
         </section>
 
         <section class="settings-wrap">
-          <p class="section-kicker">系统设置</p>
+          <p class="section-kicker">用户管理 / 系统配置</p>
           <section class="settings-bar">
             <button type="button" id="open-api-settings" class="ghost-btn">服务地址设置</button>
-            <button type="button" id="open-from-settings" class="ghost-btn">业务号码设置</button>
+            <button type="button" id="open-from-settings" class="ghost-btn">业务号码配置</button>
           </section>
         </section>
 
@@ -56,6 +56,12 @@
           <p id="conversation-window" class="muted">请先登录并选择客户</p>
           <p id="connection-status" class="muted">等待连接</p>
         </header>
+
+        <div class="workspace-actions" aria-label="工作台操作区">
+          <button type="button" class="ghost-btn action-btn" id="open-api-settings-inline">系统配置</button>
+          <button type="button" class="ghost-btn action-btn" id="open-from-settings-inline">号码配置</button>
+          <button type="button" class="ghost-btn action-btn danger" id="logout-inline">退出登录</button>
+        </div>
 
         <ul id="message-list" class="message-list"></ul>
 

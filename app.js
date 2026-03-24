@@ -68,6 +68,9 @@ const apiBaseUrlInput = document.getElementById('apiBaseUrl');
 const replyFromInput = document.getElementById('replyFrom');
 const openApiSettingsBtn = document.getElementById('open-api-settings');
 const openFromSettingsBtn = document.getElementById('open-from-settings');
+const openApiSettingsInlineBtn = document.getElementById('open-api-settings-inline');
+const openFromSettingsInlineBtn = document.getElementById('open-from-settings-inline');
+const logoutInlineBtn = document.getElementById('logout-inline');
 
 const settingsModal = document.getElementById('settings-modal');
 const modalTitle = document.getElementById('modal-title');
@@ -125,6 +128,9 @@ function bindEvents() {
 
   openApiSettingsBtn.addEventListener('click', () => openSettingsModal('apiBaseUrl'));
   openFromSettingsBtn.addEventListener('click', () => openSettingsModal('replyFrom'));
+  openApiSettingsInlineBtn?.addEventListener('click', () => openSettingsModal('apiBaseUrl'));
+  openFromSettingsInlineBtn?.addEventListener('click', () => openSettingsModal('replyFrom'));
+  logoutInlineBtn?.addEventListener('click', onLogout);
   modalCancelBtn.addEventListener('click', closeSettingsModal);
   modalSaveBtn.addEventListener('click', saveSettingsModal);
   settingsModal.addEventListener('click', (event) => {
@@ -159,6 +165,7 @@ async function onLogin(event) {
     state.auth = { loggedIn: true, username, agentRowId: String(agentRowId) };
     authStatusEl.textContent = `已登录：${username}（${agentRowId}）`;
     logoutBtn.disabled = false;
+    if (logoutInlineBtn) logoutInlineBtn.disabled = false;
 
     await syncAllHistory();
     connectWebSocket();
@@ -197,6 +204,7 @@ function setLoggedOutState(text) {
   state.auth = { loggedIn: false, username: '', agentRowId: '' };
   authStatusEl.textContent = text;
   logoutBtn.disabled = true;
+  if (logoutInlineBtn) logoutInlineBtn.disabled = true;
   sendBtn.disabled = true;
   sendMediaBtn.disabled = true;
 }
